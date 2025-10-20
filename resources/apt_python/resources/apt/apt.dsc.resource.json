@@ -1,0 +1,118 @@
+{
+  "$schema": "https://aka.ms/dsc/schemas/v3/bundled/resource/manifest.json",
+  "type": "apt_python/resources/apt",
+  "description": "Manages APT packages on Linux",
+  "version": "0.1.0",
+  "get": {
+    "executable": "python3",
+    "args": [
+      "-m",
+      "main",
+      "get"
+    ],
+    "input": "stdin",
+    "workingDirectory": "${manifestDir}/../../..",
+    "env": {
+      "PYTHONPATH": "${manifestDir}/../../.."
+    }
+  },
+  "set": {
+    "executable": "python3",
+    "args": [
+      "-m",
+      "main",
+      "set"
+    ],
+    "implementsPretest": false,
+    "input": "stdin",
+    "return": "state",
+    "workingDirectory": "${manifestDir}/../../..",
+    "env": {
+      "PYTHONPATH": "${manifestDir}/../../.."
+    }
+  },
+  "delete": {
+    "executable": "python3",
+    "args": [
+      "-m",
+      "main",
+      "delete"
+    ],
+    "implementsPretest": false,
+    "input": "stdin",
+    "return": "state",
+    "workingDirectory": "${manifestDir}/../../..",
+    "env": {
+      "PYTHONPATH": "${manifestDir}/../../.."
+    }
+  },
+  "test": {
+    "executable": "python3",
+    "args": [
+      "-m",
+      "main",
+      "test"
+    ],
+    "input": "stdin",
+    "return": "stateAndDiff",
+    "workingDirectory": "${manifestDir}/../../..",
+    "env": {
+      "PYTHONPATH": "${manifestDir}/../../.."
+    }
+  },
+  "export": {
+    "executable": "python3",
+    "args": [
+      "-m",
+      "main",
+      "export"
+    ],
+    "input": "stdin",
+    "workingDirectory": "${manifestDir}/../../..",
+    "env": {
+      "PYTHONPATH": "${manifestDir}/../../.."
+    }
+  },
+  "schema": {
+    "embedded": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema#",
+      "title": "APT Packages Management",
+      "description": "Manages APT Packages on Linux",
+      "type": "object",
+      "required": [ "name" ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Name",
+          "description": "Name of the APT package."
+        },
+        "version": {
+          "type": "string",
+          "title": "Version",
+          "description": "Specific version of the package to install."
+        },
+        "_exist": {
+          "type": "boolean",
+          "title": "Exist",
+          "description": "Whether the package should exist (installed) or not."
+        },
+        "source": {
+          "type": "string",
+          "title": "Source",
+          "description": "APT source repository for the package."
+        },
+        "dependencies": {
+          "type": "array",
+          "title": "Dependencies",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of dependent packages.",
+          "readOnly": true
+        }
+      }
+    }
+  }
+}
+

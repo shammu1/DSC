@@ -2,6 +2,8 @@ target
 bin/
 .DS_Store
 *.msix
+.vs/
+pal/
 
 # Node.js generated files for tree-sitter
 build/
@@ -9,3 +11,7 @@ node_modules/
 grammars/**/bindings/
 grammars/**/src/
 grammars/**/parser.*
+
+tree-sitter-dscexpression/
+tree-sitter-ssh-server-config/
+resources/Microsoft.Linux.Apt/Package/__pycache__/
