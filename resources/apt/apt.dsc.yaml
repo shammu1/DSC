@@ -1,0 +1,8 @@
+$schema: https://aka.ms/dsc/schemas/v3/config/document.json
+contentVersion: 1.0.0.0
+resources:
+  - name: curlInstall
+    type: apt
+    properties:  
+      name: curl
+      _exist: true

@@ -1,1 +1,3 @@
-apt.dsc.resource.sh
+adapter.py
+apt.dsc.resource.json
+main.py

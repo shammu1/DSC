@@ -1,0 +1,2 @@
+adapter.py
+pythonadapter.dsc.resource.json

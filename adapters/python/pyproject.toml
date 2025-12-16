@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apt-python-adapter"
+version = "0.1.0"
+description = "APT package management adapter for DSC"
+authors = [{name = "Unknown", email = "example@example.com"}]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+keywords = ["dsc", "apt", "configuration", "management"]
+classifiers = [
+ "Programming Language :: Python ::3",
+ "License :: OSI Approved :: MIT License",
+ "Operating System :: POSIX :: Linux"
+]
+
+[project.urls]
+Homepage = "https://github.com/shammu1/DSC"
+
+[project.dependencies]
+pydantic = ">=1.10,<3"
+
+[project.scripts]
+python-dsctest = "resources.apt_python.adapter.adapter:main"
+
+[tool.setuptools.packages.find]
+where = ["../../"]
+include = ["resources.apt_python.adapter*"]
