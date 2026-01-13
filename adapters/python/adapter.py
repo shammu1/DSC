@@ -10,7 +10,7 @@ import io
 import os
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Callable
+from typing import Any, Dict, List, Optional, Tuple, Callable
 
 
 class JsonFormatter(logging.Formatter):
@@ -19,11 +19,52 @@ class JsonFormatter(logging.Formatter):
         return json.dumps({record.levelname.lower(): record.getMessage()}, ensure_ascii=False)
 
 
-
 # ---------------------------------
 # Resource adapter implementation 
 # ---------------------------------
 TRACE_LEVEL_NUM = 5
+
+_APT_EMBEDDED_SCHEMA: Dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "APT Packages Management",
+    "description": "Manages APT Packages on Linux",
+    "type": "object",
+    "required": ["name"],
+    "additionalProperties": False,
+    "properties": {
+        "name": {"type": "string"},
+        "version": {"type": "string"},
+        "dependencies": {
+            "type": "array",
+            "items": {"type": "string"},
+            "readOnly": True
+        },
+        "_exist": {"$ref": "#/$defs/dsc_exist"}
+    },
+    "$defs": {
+        # Inline canonical schema for _exist (workaround for external $ref resolution)
+        "dsc_exist": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://raw.githubusercontent.com/PowerShell/DSC/main/schemas/2024/04/resource/properties/exist.json",
+            "title": "Instance should exist",
+            "description": "Indicates whether the DSC resource instance should exist.",
+            "type": "boolean",
+            "default": True,
+            "enum": [False, True]
+        }
+    }
+}
+
+def _parse_json(s: str) -> Dict[str, Any]:
+    try:
+        return json.loads(s or "{}")
+    except Exception:
+        return {}
+
+def _is_document_payload(payload: Dict[str, Any]) -> bool:
+    return isinstance(payload.get("resources"), list)
+
+
 class ResourceAdapter:
     """
     Provides:
@@ -61,18 +102,16 @@ class ResourceAdapter:
         # Extend here for more resource types.
         self._registry: Dict[str, Callable[[], type]] = {
             # TODO: Will have to decide the type for the apt resource.
-            "apt": self._load_apt_class,
-            # "aptpackage": self._load_apt_class,
-            # "AptPackage": self._load_apt_class,
-            # "Test/AptPackage": self._load_apt_class,  # if you choose to use a namespaced token
+            "Microsoft.Linux.Apt/Package": self._load_apt_class,
         }
         self.TRACE_LEVEL = os.getenv("DSC_TRACE_LEVEL", "info").lower()
-        self.ENABLE_PROFILING = True  # self.TRACE_LEVEL == "trace"
+        self.ENABLE_PROFILING = False # True  # self.TRACE_LEVEL == "trace"
 
         self.logger = logging.getLogger("dsc_adapter")
 
         if not self.logger.handlers:
-            handler = logging.StreamHandler()
+            # Send logs to stderr so stdout remains clean JSON for DSC
+            handler = logging.StreamHandler(sys.stderr)
             handler.setFormatter(JsonFormatter())
             self.logger.addHandler(handler)
 
@@ -144,30 +183,30 @@ class ResourceAdapter:
           - source: optional (str)
           - dependencies: optional (list[str])
         """
-        try:
-            data = json.loads(json_str or "{}")
-        except Exception as e:
-            self.log("error", f"Invalid JSON: {e}", "Adapter", operation=operation)
-            return False
+        # try:
+        #     data = json.loads(json_str or "{}")
+        # except Exception as e:
+        #     self.log("error", f"Invalid JSON: {e}", "Adapter", operation=operation)
+        #     return False
 
-        name = data.get("name")
-        if not isinstance(name, str) or not name.strip():
-            self.log("error", "Missing or invalid 'name' field", "Adapter", operation=operation)
-            return False
+        # name = data.get("name")
+        # if not isinstance(name, str) or not name.strip():
+        #     self.log("error", "Missing or invalid 'name' field", "Adapter", operation=operation)
+        #     return False
 
-        if "_exist" in data and not isinstance(data["_exist"], bool):
-            self.log("error", "Field '_exist' must be a boolean when present", "Adapter", operation=operation)
-            return False
+        # if "_exist" in data and not isinstance(data["_exist"], bool):
+        #     self.log("error", "Field '_exist' must be a boolean when present", "Adapter", operation=operation)
+        #     return False
 
-        if "dependencies" in data and not isinstance(data["dependencies"], list):
-            self.log("error", "Field 'dependencies' must be a list when present", "Adapter", operation=operation)
-            return False
+        # if "dependencies" in data and not isinstance(data["dependencies"], list):
+        #     self.log("error", "Field 'dependencies' must be a list when present", "Adapter", operation=operation)
+        #     return False
 
-        # Operation-aware checks (add as needed)
-        # Example: for 'set', ensure _exist is present to decide install/remove
-        if operation == "set" and "_exist" not in data:
-            self.log("error", "For 'set', '_exist' is required", "Adapter", operation=operation)
-            return False
+        # # Operation-aware checks (add as needed)
+        # # Example: for 'set', ensure _exist is present to decide install/remove
+        # if operation == "set" and "_exist" not in data:
+        #     self.log("error", "For 'set', '_exist' is required", "Adapter", operation=operation)
+        #     return False
 
         return True
 
@@ -194,10 +233,9 @@ class ResourceAdapter:
         except Exception:
             pass
 
-        # Try local relative import based on current file system position
         _here = Path(__file__).resolve()
-        _repo_root = _here.parents[3] if len(_here.parents) >= 4 else _here.parent
-        _resources_root = _here.parents[2] if len(_here.parents) >= 3 else _here.parent
+        _repo_root = _here.parents[2] if len(_here.parents) >= 3 else _here.parent
+        _resources_root = _repo_root / "resources"
         for p in (_repo_root, _resources_root):
             p_str = str(p)
             if p_str not in sys.path:
@@ -239,33 +277,181 @@ class ResourceAdapter:
     # -----------------
     # Operation routing
     # -----------------
-    def list_capabilities(self) -> Dict[str, Any]:
-        """Return supported resource types and input characteristics."""
-        supported = sorted(set(self._registry.keys()))
+    def _apt_resource_descriptor(self) -> Dict[str, Any]:
+        """
+        Build a manifest-like descriptor for the Apt resource so DSC can
+        discover and use it without a separate apt.dsc.resource.json.
+        """
+        here = Path(__file__).resolve()
+        repo_root = here.parents[2] if len(here.parents) >= 3 else here.parent
+        apt_path = (repo_root / "resources" / "apt" / "AptPackage.py").resolve()
+        
         return {
-            "supportedResourceTypes": supported,
-            "inputKind": "single",  # mirrors your manifest
-            "operations": ["list", "get", "set", "test", "export", "validate"],
-        }
+                # These are the list-output fields DSC accepts
+                "type": "Microsoft.Linux.Apt/Package",
+                "kind": "resource",
+                "version": "0.1.0",
+                "capabilities": ["get", "set", "test", "export"],
+                "path": str(apt_path),
+                "directory": str(apt_path.parent),
+                "implementedAs": "Python",
+                "author": "",
+                "properties": ["name", "version", "_exist", "dependencies"],
+                "requireAdapter": "Microsoft.DSC.Adapters/Python",
+                "description": "Manages APT packages on Linux",
+
+                # IMPORTANT: this must look like a resource manifest and MUST include type+version
+                "manifest": {
+                    "$schema": "https://aka.ms/dsc/schemas/v3/resource/manifest.json",
+                    "type": "Microsoft.Linux.Apt/Package",
+                    "version": "0.1.0",
+                    "description": "Manages APT packages on Linux",
+                    "schema": {
+                        "embedded": _APT_EMBEDDED_SCHEMA
+                    }
+                }
+            }
+
+
+
+    def list_resources(self) -> Dict[str, Any]:
+        """Return a list of supported resources with descriptors."""
+        return self._apt_resource_descriptor()
+ 
+    # -----------------
+    # Document-mode execution
+    # -----------------
+    def _run_document_operation(self, operation: str, doc_json: str) -> Tuple[int, Dict[str, Any]]:
+        data = _parse_json(doc_json)
+        if not _is_document_payload(data):
+            return 3, {"error": "Invalid document payload: missing 'resources' array"}
+
+        results: List[Dict[str, Any]] = []
+        for res in data.get("resources", []):
+            dsc_type = (res.get("type") or "").strip()
+            name = res.get("name", "")
+            props = res.get("properties", {}) or {}
+            try:
+                cls = self._resolve_resource_class(dsc_type)
+            except Exception as e:
+                self.log("error", f"Type '{dsc_type}': {e}", "Adapter", operation=operation)
+                return 2, {"error": f"{dsc_type}: {e}"}
+
+            props_json = json.dumps(props)
+            try:
+                if operation == "get":
+                    instance = self._instantiate_resource(cls, props_json, operation="get")
+                    state = instance.get()                 
+                    
+                    state = {k: v for k, v in state.items() if v is not None}
+
+                    # If you want to be extra strict about specific fields:
+                    if "source" in state and not isinstance(state["source"], str):
+                        state.pop("source", None)
+
+                    if "version" in state and not isinstance(state["version"], str):
+                        state.pop("version", None)
+
+                    if "dependencies" in state:
+                        if isinstance(state["dependencies"], list):
+                            state["dependencies"] = [d for d in state["dependencies"] if isinstance(d, str)]
+                        else:
+                            state["dependencies"] = []
+
+                    results.append({
+                        "name": name,
+                        "type": dsc_type,
+                        "properties": state
+                    })
+
+                elif operation == "set":
+                    instance = self._instantiate_resource(cls, props_json, operation="set")
+                    set_result = instance.set()
+
+                    if isinstance(set_result, dict):
+                        properties = set_result
+                    else:
+                        properties = {}
+                    results.append({"name": name, "type": dsc_type, "properties": properties})
+
+                elif operation == "test":
+                    instance = self._instantiate_resource(cls, props_json, operation="test")
+                    actual_state, diffs = instance.test()
+                    properties = {
+                        "InDesiredState": len(diffs) == 0,
+                        "actualState": actual_state,
+                        "differingProperties": diffs
+                    }
+                    results.append({"name": name, "type": dsc_type, "properties": properties})
+
+                elif operation == "export":
+                    instance = self._instantiate_resource(cls, props_json, operation="export")
+                    data_out = cls.export(instance)
+                    properties = data_out if isinstance(data_out, dict) else {}
+                    results.append({"name": name, "type": dsc_type, "properties": properties})
+
+                else:
+                    msg = f"Unsupported operation '{operation}' in document mode"
+                    self.log("error", msg, "Adapter")
+                    return 2, {"error": msg}
+
+            except SystemExit as se:
+                code = int(getattr(se, "code", 1) or 1)
+                self.log("error", f"Resource terminated with exit {code}", "Adapter", operation=operation)
+                return code, {"error": f"Resource terminated with exit {code}"}
+            except Exception as err:
+                self.log("error", f"{dsc_type} {operation} failed: {err}", "Adapter", operation=operation)
+                return 1, {"error": str(err)}
+
+            
+        if operation == "get": 
+            adapter_instance_name = ""
+            if data.get("resources"):
+                first = data["resources"][0]
+                adapter_instance_name = first.get("name") or first.get("type") or ""
+
+            return 0, {
+                "name": adapter_instance_name,
+                "type": "Microsoft.DSC.Adapters/Python",
+                "result": results
+            }
+        return 0, results
+
+
+
 
     def run_operation(self, operation: str, json_input: str, resource_type: str) -> Tuple[int, Dict[str, Any]]:
         """
         Returns (exit_code, result_dict). Prints nothing; caller decides printing.
+        Supports:
+          - list (no input)
+          - document-shaped input (preferred)
+          - legacy single-resource input (backward compatible)
         """
         op = (operation or "").strip().lower()
         if op == "list":
             with self.profile_block("Adapter List"):
-                result = self.list_capabilities()
-            return 0, result
+                descriptor = self.list_resources()
+            return 0, descriptor
 
-        # All ops below require a resource type
+        if op == "validate":
+            return 0, {"valid": True}
+
+        # Prefer document-shaped input if present
+        as_obj = _parse_json(json_input)
+        if _is_document_payload(as_obj):
+            if not self.validate_input_json(json_input, operation=op):
+                return 3, {"error": "Invalid document JSON"}
+            return self._run_document_operation(op, json_input)
+
+        # Legacy single-resource path below
         try:
             cls = self._resolve_resource_class(resource_type)
         except Exception as e:
             self.log("error", str(e), "Adapter", operation=op)
             return 2, {"error": str(e)}
 
-        # Validate for ops that take input JSON (get/set/test/validate/export when specific package filtering is used)
+        # Validate for ops that take input JSON (get/set/test/validate/export)
         if op in ("get", "set", "test", "validate", "export"):
             if not self.validate_input_json(json_input, operation=op):
                 return 3, {"error": "Invalid input JSON"}
@@ -275,7 +461,9 @@ class ResourceAdapter:
                 with self.profile_block("DSC Get Operation"):
                     instance = self._instantiate_resource(cls, json_input, operation="get")
                     data = instance.get()
-                return 0, data
+                return (0, {"result": {"actualState": data}})
+                # return (0, {"actualState": data})
+                #return (0, {"result": data})
 
             elif op == "set":
                 with self.profile_block("DSC Set Operation"):
@@ -286,7 +474,7 @@ class ResourceAdapter:
                     state = {k: v for k, v in data.items() if k != "differingProperties"}
                     diffs = data.get("differingProperties", [])
                     return 0, {"state": state, "differingProperties": diffs}
-                return 0, data if isinstance(data, dict) else {"result": data}
+                return (0, {"result": data if isinstance(data, dict) else {}})
 
             elif op == "test":
                 with self.profile_block("DSC Test Operation"):
@@ -298,7 +486,7 @@ class ResourceAdapter:
                         "differingProperties": diffs,
                         "inDesiredState": len(diffs) == 0,
                     }
-                return 0, result
+                return (0, result)
 
             elif op == "export":
                 # If your resource supports filtered export with provided input, pass instance; else pass None for full export
@@ -308,8 +496,7 @@ class ResourceAdapter:
                     # Here we call and rely on resource's own printing behavior to remain compatible.
                     data = cls.export(instance)
                     # If export returns None (prints only), still return an empty dict for adapter contract
-                    return 0, data if isinstance(data, dict) else {"status": "export invoked"}
-
+                    return (0, data if isinstance(data, dict) else {})
 
             else:
                 msg = f"Unsupported operation '{operation}'. Expected one of: list, get, set, test, export, validate"
@@ -343,27 +530,52 @@ def _build_parser() -> argparse.ArgumentParser:
     adapter.add_argument("--resource-type", default="", help="Resource type selector (e.g., apt, AptPackage).")
     return parser
 
-# Adapter instance importable by resources (AptPackage.py)
+# Adapter instance importable by resources
 resource_adapter: ResourceAdapter = ResourceAdapter()
 
 def main(argv: Optional[list] = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-
     if args.command != "adapter":
         print(json.dumps({"error": "Unsupported command"}))
         return 2
 
-    #resource_adapter = ResourceAdapter()
+    # 1. Start with --input as the authoritative source
+    input_str = args.input
 
-    # Mirror manifest behavior: allow 'list' with resource-type 'none' or empty
-    resource_type = args.resource_type if args.operation != "list" else (args.resource_type or "none")
+    # 2. ONLY read stdin if:
+    #    - --input was empty or "{}"
+    #    - AND stdin has data available immediately (non‑blocking)
+    if input_str in ("", "{}", None) and args.operation not in ("list",):
+        try:
+            import select
+            r, _, _ = select.select([sys.stdin], [], [], 0)
+            if r:
+                stdin_data = sys.stdin.read().strip()
+                if stdin_data:
+                    input_str = stdin_data
+        except Exception:
+            pass
 
-    exit_code, result = resource_adapter.run_operation(args.operation, args.input, resource_type)
-    # Always print a JSON result for consistency
-    print(json.dumps(result))
+    # 3. Call operation handler
+    exit_code, result = resource_adapter.run_operation(
+        args.operation,
+        input_str,
+        args.resource_type
+    )
+
+    # 4. Capture EXACT output passed to DSC
+    out_json = json.dumps(result, ensure_ascii=False)
+    try:
+        with open("/tmp/dsc_python_adapter_last_stdout.json", "w", encoding="utf-8") as f:
+            f.write(out_json)
+    except Exception:
+        pass
+
+    print(out_json)
     return exit_code
+
 
 
 if __name__ == "__main__":

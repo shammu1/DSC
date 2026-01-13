@@ -56,20 +56,6 @@ class AptPackage:
             dependencies=data.get('dependencies') or []
         )
 
-    # @classmethod
-    # def from_json(cls, json_str: str) -> 'AptPackage':
-    #     """Create an AptPackage object from JSON string."""
-    #     if not adapter.validate_input_json(json_str):
-    #         raise ValueError("Invalid JSON input")
-    #     data = json.loads(json_str)
-    #     return AptPackage(
-    #         name=data.get('name'),
-    #         version=data.get('version'),
-    #         _exist=data.get('_exist', True),
-    #         source=data.get('source'),
-    #         dependencies=data.get('dependencies') or []
-    #     )
-
     def to_json(self) -> str:
         """Create an JSON string representation of package instance."""
         pkg_data = {
@@ -142,17 +128,38 @@ class AptPackage:
             version = self.version
             if installed and not version:
                 version = self.get_latest_installed_version()
-            # version = self.get_latest_installed_version() if not self.version else self.version
-            # is_installed = self.is_installed() if version is not None else False
-            pkg_dict = {
-                "name": self.name,
-                "version": version,
-                "_exist": installed, #is_installed,
-                "source": self.source,
-                "dependencies": self.dependencies
-            }
-            adapter.log("trace","Get Status for Apt - Test1", "Apt Management", command="get", method="get")
-        return pkg_dict
+            
+            # Ensure dependencies is always a list (DSC-friendly)
+            deps = self.dependencies if isinstance(self.dependencies, list) else []
+
+            
+            state = {
+                        "name": self.name,
+                        "_exist": bool(installed),
+                        "dependencies": deps,
+                    }
+
+            # Only include optional fields if they are valid types
+            if version:
+                state["version"] = version
+            
+            if isinstance(self.source, str) and self.source.strip():
+                state["source"] = self.source
+
+
+        return state
+
+        #     # Build DSC-compatible actual state object
+        #     pkg_dict = {
+        #         "name": self.name,
+        #         "version": version if version else None,
+        #         "_exist": bool(installed),
+        #         "source": self.source,
+        #         "dependencies": deps
+        #     }
+
+        #     #adapter.log("trace","Get Status for Apt - Test1", "Apt Management", command="get", method="get")
+        # return pkg_dict
 
     def install(self):
         """Install the specified APT package."""
@@ -308,10 +315,11 @@ class AptPackage:
                 sys.exit(1)
 
             result = {"packages": packages}
-            print(json.dumps(result))
+            #print(json.dumps(result))
+            return result
         except Exception as err:
-            adapter.log("error", f"Failed to export packages: {err}", "Apt Management", command="export", method="export")
-            print(json.dumps({"error": str(err), "packages": []}))
+            #adapter.log("error", f"Failed to export packages: {err}", "Apt Management", command="export", method="export")
+            #print(json.dumps({"error": str(err), "packages": []}))
             return {'Error': str(err)}
 
 

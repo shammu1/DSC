@@ -1,21 +1,19 @@
 {
   "$schema": "https://aka.ms/dsc/schemas/v3/bundled/resource/manifest.json",
-  "type": "Microsoft.DSC/PythonAdapter",
+  "type": "Microsoft.DSC.Adapters/Python",
   "version": "0.1.0",
   "kind": "adapter",
   "description": "Manages APT packages on Linux",
   "adapter": {
     "list": {
-      "executable": "pwsh",
+      "executable": "python3",
       "args": [
-        "-NoLogo",
-        "-NonInteractive",
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-Command",
-        "./psDscAdapter/powershell.resource.ps1 List"
-      ]
+        "adapter.py",
+        "adapter",
+        "--operation",
+        "list"
+      ],
+      "workingDirectory": "${manifestDir}/../../.."
     },
     "config": "full"
   },
@@ -29,9 +27,7 @@
       {
         "jsonInputArg": "--input",
         "mandatory": true
-      },
-      "--resource-type",
-      "apt"
+      }
     ],
     "input": "stdin",
     "workingDirectory": "${manifestDir}/../../.."
@@ -46,9 +42,7 @@
       {
         "jsonInputArg": "--input",
         "mandatory": true
-      },
-      "--resource-type",
-      "apt"
+      }
     ],
     "implementsPretest": false,
     "input": "stdin",
@@ -65,9 +59,7 @@
       {
         "jsonInputArg": "--input",
         "mandatory": true
-      },
-      "--resource-type",
-      "apt"
+      }
     ],
     "implementsPretest": false,
     "input": "stdin",
@@ -84,9 +76,7 @@
       {
         "jsonInputArg": "--input",
         "mandatory": true
-      },
-      "--resource-type",
-      "apt"
+      }
     ],
     "input": "stdin",
     "return": "stateAndDiff",
@@ -102,9 +92,22 @@
       {
         "jsonInputArg": "--input",
         "mandatory": true
-      },
-      "--resource-type",
-      "apt"
+      }
+    ],
+    "input": "stdin",
+    "workingDirectory": "${manifestDir}/../../.."
+  },
+  "validate": {
+    "executable": "python3",
+    "args": [
+      "adapter.py",
+      "adapter",
+      "--operation",
+      "validate",
+      {
+        "jsonInputArg": "--input",
+        "mandatory": true
+      }
     ],
     "input": "stdin",
     "workingDirectory": "${manifestDir}/../../.."
@@ -112,45 +115,5 @@
   "exitCodes": {
     "0": "Success",
     "1": "Error"
-  },
-  "schema": {
-    "embedded": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema#",
-      "title": "APT Packages Management",
-      "description": "Manages APT Packages on Linux",
-      "type": "object",
-      "required": [ "name" ],
-      "properties": {
-        "name": {
-          "type": "string",
-          "title": "Name",
-          "description": "Name of the APT package."
-        },
-        "version": {
-          "type": "string",
-          "title": "Version",
-          "description": "Specific version of the package to install."
-        },
-        "_exist": {
-          "type": "boolean",
-          "title": "Exist",
-          "description": "Whether the package should exist (installed) or not."
-        },
-        "source": {
-          "type": "string",
-          "title": "Source",
-          "description": "APT source repository for the package."
-        },
-        "dependencies": {
-          "type": "array",
-          "title": "Dependencies",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of dependent packages.",
-          "readOnly": true
-        }
-      }
-    }
   }
 }
