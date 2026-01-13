@@ -4,9 +4,7 @@
     "SupportedPlatformOS": "Linux",
     "CopyFiles": {
         "Linux": [
-            "AptPackage.py",
-            "apt.dsc.resource.json",
-            "main.py"
+            "AptPackage.py"
         ]
     }
 }
