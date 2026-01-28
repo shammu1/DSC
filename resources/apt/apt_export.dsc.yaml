@@ -3,5 +3,5 @@ contentVersion: 1.0.0.0
 resources:
   - name: curlInstall
     type: apt
-    properties:   
-      version: 8.5.0-2ubuntu10.6
+    properties:  
+      name: curl      

@@ -1,6 +1,7 @@
 import subprocess
 import json
 import sys
+from typing import Any, Dict, List, Optional, Tuple, Callable
 from pathlib import Path
 
 # robust adapter import
@@ -41,7 +42,7 @@ class AptPackage:
         self._exist = _exist
         self.source = source
         self.dependencies = dependencies
-
+    
     @classmethod
     def from_json(cls, json_str: str, operation: str = None) -> 'AptPackage':
         # Pass operation so conditional validation can occur
@@ -131,7 +132,6 @@ class AptPackage:
             
             # Ensure dependencies is always a list (DSC-friendly)
             deps = self.dependencies if isinstance(self.dependencies, list) else []
-
             
             state = {
                         "name": self.name,
@@ -146,20 +146,9 @@ class AptPackage:
             if isinstance(self.source, str) and self.source.strip():
                 state["source"] = self.source
 
-
+            adapter.log("trace","Get Status for Apt - Test1", "Apt Management", command="get", method="get")
         return state
 
-        #     # Build DSC-compatible actual state object
-        #     pkg_dict = {
-        #         "name": self.name,
-        #         "version": version if version else None,
-        #         "_exist": bool(installed),
-        #         "source": self.source,
-        #         "dependencies": deps
-        #     }
-
-        #     #adapter.log("trace","Get Status for Apt - Test1", "Apt Management", command="get", method="get")
-        # return pkg_dict
 
     def install(self):
         """Install the specified APT package."""
@@ -206,28 +195,46 @@ class AptPackage:
             if before_installed != after_installed:
                 diffs.append("_exist")
 
+            version = self.version
+            if after_installed and not version:
+                version = self.get_latest_installed_version()
+
+            state = {
+                "name": self.name,
+                "_exist": after_installed
+            }
+            if version:
+                state["version"] = version
+
+            # Always return state + differingProperties
             return {
-                "_exist": after_installed,
+                "state": state,
                 "differingProperties": diffs
             }
         except subprocess.CalledProcessError as err:
             adapter.log("error", f"Failed to set state for package '{self.name}': {err}", "Apt Management", command="set", method="set")
-            return f"Failed to set state: {err}"
+            return {
+                "state": {
+                    "name": self.name,
+                    "_exist": before_installed if 'before_installed' in locals() else False
+                },
+                "differingProperties": ["_exist"]
+            }
 
     @staticmethod
     def export(apt_package=None):
         """Export a list of all installed APT packages."""
         try:
-            if apt_package:
-                available_check = subprocess.run(
-                    ['apt-cache', 'show', apt_package.name],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
-                if available_check.returncode != 0:
-                    adapter.log_error(f"Package provided in the config cannot be installed.", "Apt Management", command="export", method="export")
-                    sys.exit(1)
+            # if apt_package:
+            #     available_check = subprocess.run(
+            #         ['apt-cache', 'show', apt_package.name],
+            #         stdout=subprocess.PIPE,
+            #         stderr=subprocess.PIPE,
+            #         text=True
+            #     )
+            #     if available_check.returncode != 0:
+            #         adapter.log_error(f"Package provided in the config cannot be installed.", "Apt Management", command="export", method="export")
+            #         #sys.exit(1)
 
             dpkg_output = subprocess.check_output(['dpkg-query', '-W', '-f=${Package}\n']).decode().splitlines()
             packages = []
@@ -237,6 +244,7 @@ class AptPackage:
                     pkg_info = {}
                     for line in apt_cache_output.splitlines():
                         if line.startswith('Package:'):
+
                             pkg_info['name'] = line.split(':', 1)[1].strip()
                         elif line.startswith('Version:'):
                             pkg_info['version'] = line.split(':', 1)[1].strip()
@@ -312,14 +320,12 @@ class AptPackage:
 
             if apt_package and not packages:
                 adapter.log("error", f"Package provided in the config is not currently installed.", "Apt Management", command="export", method="export")
-                sys.exit(1)
+                #sys.exit(1)
 
             result = {"packages": packages}
-            #print(json.dumps(result))
             return result
         except Exception as err:
-            #adapter.log("error", f"Failed to export packages: {err}", "Apt Management", command="export", method="export")
-            #print(json.dumps({"error": str(err), "packages": []}))
+            adapter.log("error", f"Failed to export packages: {err}", "Apt Management", command="export", method="export")
             return {'Error': str(err)}
 
 

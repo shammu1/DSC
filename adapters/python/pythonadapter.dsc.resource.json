@@ -12,10 +12,9 @@
         "adapter",
         "--operation",
         "list"
-      ],
-      "workingDirectory": "${manifestDir}/../../.."
+      ]
     },
-    "config": "full"
+    "config": "single"
   },
   "get": {
     "executable": "python3",
@@ -24,13 +23,13 @@
       "adapter",
       "--operation",
       "get",
+      { "resourceTypeArg": "--ResourceType" },
       {
         "jsonInputArg": "--input",
         "mandatory": true
       }
     ],
-    "input": "stdin",
-    "workingDirectory": "${manifestDir}/../../.."
+    "input": "stdin"
   },
   "set": {
     "executable": "python3",
@@ -39,6 +38,7 @@
       "adapter",
       "--operation",
       "set",
+      { "resourceTypeArg": "-ResourceType" },
       {
         "jsonInputArg": "--input",
         "mandatory": true
@@ -46,25 +46,7 @@
     ],
     "implementsPretest": false,
     "input": "stdin",
-    "return": "stateAndDiff",
-    "workingDirectory": "${manifestDir}/../../.."
-  },
-  "delete": {
-    "executable": "python3",
-    "args": [
-      "adapter.py",
-      "adapter",
-      "--operation",
-      "delete",
-      {
-        "jsonInputArg": "--input",
-        "mandatory": true
-      }
-    ],
-    "implementsPretest": false,
-    "input": "stdin",
-    "return": "state",
-    "workingDirectory": "${manifestDir}/../../.."
+    "return": "stateAndDiff"
   },
   "test": {
     "executable": "python3",
@@ -73,14 +55,14 @@
       "adapter",
       "--operation",
       "test",
+      { "resourceTypeArg": "-ResourceType" },
       {
         "jsonInputArg": "--input",
         "mandatory": true
       }
     ],
     "input": "stdin",
-    "return": "stateAndDiff",
-    "workingDirectory": "${manifestDir}/../../.."
+    "return": "stateAndDiff"
   },
   "export": {
     "executable": "python3",
@@ -89,13 +71,13 @@
       "adapter",
       "--operation",
       "export",
+      { "resourceTypeArg": "-ResourceType" },
       {
         "jsonInputArg": "--input",
         "mandatory": true
       }
     ],
-    "input": "stdin",
-    "workingDirectory": "${manifestDir}/../../.."
+    "input": "stdin"
   },
   "validate": {
     "executable": "python3",
@@ -104,13 +86,13 @@
       "adapter",
       "--operation",
       "validate",
+      { "resourceTypeArg": "-ResourceType" },
       {
         "jsonInputArg": "--input",
         "mandatory": true
       }
     ],
-    "input": "stdin",
-    "workingDirectory": "${manifestDir}/../../.."
+    "input": "stdin"
   },
   "exitCodes": {
     "0": "Success",
