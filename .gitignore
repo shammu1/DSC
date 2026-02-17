@@ -9,5 +9,7 @@ bin/
 grammars/**/bindings/
 grammars/**/src/
 grammars/**/parser.*
+/adapters/__pycache__
 /adapters/python/__pycache__
+/adapters/python/tests/src/__pycache__
 /resources/apt/__pycache__
