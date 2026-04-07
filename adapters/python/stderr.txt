@@ -1,0 +1,1 @@
+{"level": "info", "message": "Registered resource types: ['PythonTest/Get', 'PythonTest/Set', 'pythontest/get', 'pythontest/set']", "target": "dsc_adapter", "operation": "init", "resourceType": "", "method": "", "timestamp": "2026-02-18T20:08:17.731+00:00"}

@@ -22,7 +22,7 @@ $AdapterPath = if ($AdapterDir) { Join-Path -Path $AdapterDir -ChildPath "adapte
 function global:Invoke-Adapter {
     param(
         [string]$Operation,
-        [string]$ResourceType,
+        [string]$resource,
         [string]$InputJson = "{}"
     )
 
@@ -39,11 +39,11 @@ function global:Invoke-Adapter {
     }
 
     $scriptPath = (Resolve-Path -LiteralPath $adapterPath).Path
-    Write-Host "CMD: $PythonExe `"$scriptPath`" adapter --operation $Operation --input $InputJson --ResourceType $ResourceType" -ForegroundColor Yellow
+    Write-Host "CMD: $PythonExe `"$scriptPath`" adapter --operation $Operation --input $InputJson --resource $resource" -ForegroundColor Yellow
 
     Push-Location -LiteralPath $adapterDir
     try {
-        $stdout = & $PythonExe $scriptPath adapter --operation $Operation --input $InputJson --ResourceType $ResourceType 2> stderr.txt
+        $stdout = & $PythonExe $scriptPath adapter --operation $Operation --input $InputJson --resource $resource 2> stderr.txt
         $stderr = Get-Content -LiteralPath stderr.txt -Raw -ErrorAction SilentlyContinue
     }
     finally {
@@ -62,7 +62,7 @@ Describe "Python Adapter - GET Operation" {
         $rt = "PythonTest/Get"
         $json = '{"name":"pkg","_exist":true}'
 
-        $result = Invoke-Adapter -Operation "get" -ResourceType $rt -InputJson $json
+        $result = Invoke-Adapter -Operation "get" -resource $rt -InputJson $json
 
         $result.ExitCode | Should -Be 0 -Because $result.StdErr
         $result.StdOut   | Should -Match '^\{.*\}$' -Because $result.StdErr

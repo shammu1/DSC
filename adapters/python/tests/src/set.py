@@ -1,33 +1,43 @@
 # tests/resources/set.py
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
 class SetOnlyResource:
-    def __init__(self, name: str = "pkg", _exist: bool = True, want_exist: bool = True, **_):
+    def __init__(self, name: str = "pkg", _exist: bool = True, **_):
         self.name = name
-        self._exist = _exist          # current
-        self.want_exist = want_exist  # desired
+        #Future change: _exist will be named different in the resource and mapped with DSC's _exist.
+        self._exist = _exist  # Desired state from input
 
     @classmethod
     def from_json(cls, json_str: str, operation: str = None) -> "SetOnlyResource":
         data = json.loads(json_str or "{}")
         return cls(
             name=data.get("name", "pkg"),
-            _exist=data.get("_exist", False),       # simulate "before"
-            want_exist=data.get("want_exist", True) # test-only desired knob
+            _exist=data.get("_exist", True)
         )
 
-    def set(self) -> Dict[str, Any]:
-        # Simulate idempotent flip to desired
-        after = self.want_exist
+    def get(self) -> Dict[str, Any]:
+        """Simulate current state query. For a real resource, query actual state here."""
+        # For testing, assume current state is opposite of desired to show a change.
+        # In production, read from system.
+        return {
+            "name": self.name,
+            "_exist": not self._exist  # simulate current != desired
+        }
+
+    def set(self) -> Tuple[Dict[str, Any], List[str]]:
+        """Apply desired state. Return (after_state, diffs)."""
+        # Simulate applying the change: after state = desired state
+        current_exist = not self._exist  # simulate fetching current (from get())
+        after_exist = self._exist        # desired
+
         diffs: List[str] = []
-        if after != self._exist:
+        if after_exist != current_exist:
             diffs.append("_exist")
 
-        state: Dict[str, Any] = {
+        after_state: Dict[str, Any] = {
             "name": self.name,
-            "_exist": after
+            "_exist": after_exist
         }
-        # Contract: return an object with state + differingProperties
-        return state, diffs
+        return after_state, diffs
 

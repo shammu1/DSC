@@ -6,6 +6,7 @@ class GetOnlyResource:
     def __init__(self, name: str = "pkg", version: str = None, _exist: bool = True, **_):
         self.name = name
         self.version = version
+        #Future change: _exist will be named different in the resource and mapped with DSC's _exist.
         self._exist = _exist
 
     @classmethod

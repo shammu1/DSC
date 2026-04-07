@@ -3,33 +3,10 @@ import json
 import sys
 from typing import Any, Dict, List, Optional, Tuple, Callable
 from pathlib import Path
-
-# robust adapter import
-try:
-    # Correct relative import: from resources.apt.resources.apt -> up 2 levels -> resources.apt
-    from ...adapters.python.adapter import resource_adapter as adapter  # package relative
-except Exception:
-    _here = Path(__file__).resolve()
-    # Path tree: .../DSC/resources/apt/resources/apt/AptPackage.py
-    # parents[4] -> repo root (DSC), parents[3] -> top-level 'resources'
-    _repo_root = _here.parents[4] if len(_here.parents) >= 5 else _here.parent
-    _resources_root = _here.parents[3] if len(_here.parents) >= 4 else _here.parent
-    for p in (_repo_root, _resources_root):
-        p_str = str(p)
-        if p_str not in sys.path:
-            sys.path.insert(0, p_str)
-    try:
-        from adapters.python.adapter import resource_adapter as adapter  # absolute import
-    except Exception:
-        from contextlib import contextmanager
-        class _FallbackAdapter:  # type: ignore
-            @contextmanager
-            def profile_block(self, label):
-                yield
-            def log(self, level, message: str, target: str = None, **kwargs):
-                print(json.dumps({"level": level, "message": message + "From Exception", "target": target, **kwargs}), file=sys.stderr)
-        adapter = _FallbackAdapter()
-
+import logging
+import io
+import time
+log = logging.getLogger(__name__)
 
 class AptPackage:
     """
@@ -43,11 +20,10 @@ class AptPackage:
         self.source = source
         self.dependencies = dependencies
     
+
     @classmethod
     def from_json(cls, json_str: str, operation: str = None) -> 'AptPackage':
-        # Pass operation so conditional validation can occur
-        if not adapter.validate_input_json(json_str, operation=operation):
-            raise ValueError("Invalid JSON input")
+        # TODO: Placeholder for any input validations if needed
         data = json.loads(json_str)
         return AptPackage(
             name=data.get('name'),
@@ -78,7 +54,7 @@ class AptPackage:
                     installed_version.append(version)
             return installed_version
         except subprocess.CalledProcessError as err:
-            adapter.log("error",f"Error fetching installed versions for {self.name}: {err}", "Apt Management", method="installed_pkg_versions")
+            #adapter.log("error",f"Error fetching installed versions for {self.name}: {err}", "Apt Management", method="installed_pkg_versions")
             return []
 
     def get_latest_installed_version(self):
@@ -94,7 +70,7 @@ class AptPackage:
             else:
                 return None
         except Exception as err:
-            adapter.log("error",f"Error fetching latest of versions installed for {self.name}: {err}", "Apt Management", method="get_latest_installed_version")
+            #adapter.log("error",f"Error fetching latest of versions installed for {self.name}: {err}", "Apt Management", method="get_latest_installed_version")
             return None
 
     def get_all_available_versions(self):
@@ -103,7 +79,7 @@ class AptPackage:
             available_versions = subprocess.run(['apt-cache', 'madison', self.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
             return [line.split('|')[1].strip() for line in available_versions.stdout.splitlines() if '|' in line]
         except subprocess.CalledProcessError as err:
-            adapter.log("error", f"Error fetching available versions for {self.name}: {err}", "Apt Management", method="get_all_available_versions")
+            #adapter.log("error", f"Error fetching available versions for {self.name}: {err}", "Apt Management", method="get_all_available_versions")
             return []
 
     def is_installed(self):
@@ -113,58 +89,55 @@ class AptPackage:
                 return (self.version in self.installed_pkg_versions())
             else:
                 return len(self.installed_pkg_versions()) > 0
-                # installed = subprocess.run(['dpkg', '-l', self.name], check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                # if installed.returncode == 0:
-                #     return True
-                # else:
-                #     return False
+
         except Exception as err:
-            adapter.log("error", f"Error checking package '{self.name}': {err}", "Apt Management", method="is_installed")
+            #adapter.log("error", f"Error checking package '{self.name}': {err}", "Apt Management", method="is_installed")
             return False
 
     def get(self):
         """Return the current state of the package as a JSON string."""
-        with adapter.profile_block("DSC Get Operation"):
-            installed = self.is_installed()
-            version = self.version
-            if installed and not version:
-                version = self.get_latest_installed_version()
+        installed = self.is_installed()
+        version = self.version
+        if installed and not version:
+            version = self.get_latest_installed_version()
             
             # Ensure dependencies is always a list (DSC-friendly)
-            deps = self.dependencies if isinstance(self.dependencies, list) else []
+        deps = self.dependencies if isinstance(self.dependencies, list) else []
             
-            state = {
-                        "name": self.name,
-                        "_exist": bool(installed),
-                        "dependencies": deps,
-                    }
-
-            # Only include optional fields if they are valid types
-            if version:
-                state["version"] = version
+        state = {
+                    "name": self.name,
+                    "_exist": bool(installed),
+                    "dependencies": deps,
+                }
+    
+        # Only include optional fields if they are valid types
+        if version:
+            state["version"] = version
             
-            if isinstance(self.source, str) and self.source.strip():
-                state["source"] = self.source
+        if isinstance(self.source, str) and self.source.strip():
+           state["source"] = self.source
 
-            adapter.log("trace","Get Status for Apt - Test1", "Apt Management", command="get", method="get")
+        #adapter.log("trace","Get Status for Apt - Test1", "Apt Management", command="get", method="get")
+        log.debug("Computed GET state for '%s'", self.name)
+        
         return state
 
 
     def install(self):
         """Install the specified APT package."""
         try:
-            subprocess.run(['sudo', 'apt-get', 'install', '-y', self.name], check=True)
+            subprocess.run(['sudo', 'apt-get', 'install', '-y', self.name], check=True,stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         except subprocess.CalledProcessError as err:
-            adapter.log("error", f"Failed to install package '{self.name}': {err}", "Apt Management", command="set", method="install")
-            pass
+            #adapter.log("error", f"Failed to install package '{self.name}': {err}", "Apt Management", command="set", method="install")
+            return
 
     def delete(self):
         """Remove the specified APT package."""
         try:
-            subprocess.run(['sudo', 'apt-get', 'remove', '-y', self.name], check=True)
+            subprocess.run(['sudo', 'apt-get', 'remove', '-y', self.name], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         except subprocess.CalledProcessError as err:
-            adapter.log("error", f"Failed to remove package '{self.name}': {err}", "Apt Management", command="set", method="delete")
-
+            #adapter.log("error", f"Failed to remove package '{self.name}': {err}", "Apt Management", command="set", method="delete")
+            return
     def test(self):
         """ Test if the state of an APT package aligns with its configuration """
         try:
@@ -178,7 +151,7 @@ class AptPackage:
             return actual_state, differingProperties
 
         except subprocess.CalledProcessError as err:
-            adapter.log("error",f"Failed to test state for package '{self.name}': {err}", "Apt Management", command="test", method="test")
+            # adapter.log("error",f"Failed to test state for package '{self.name}': {err}", "Apt Management", command="test", method="test")
             return {"error": f"Failed to test state: {err}"}, []
 
     def set(self):
@@ -206,13 +179,10 @@ class AptPackage:
             if version:
                 state["version"] = version
 
-            # Always return state + differingProperties
-            return {
-                "state": state,
-                "differingProperties": diffs
-            }
+            return state, diffs
+
         except subprocess.CalledProcessError as err:
-            adapter.log("error", f"Failed to set state for package '{self.name}': {err}", "Apt Management", command="set", method="set")
+            #adapter.log("error", f"Failed to set state for package '{self.name}': {err}", "Apt Management", command="set", method="set")
             return {
                 "state": {
                     "name": self.name,
@@ -225,107 +195,62 @@ class AptPackage:
     def export(apt_package=None):
         """Export a list of all installed APT packages."""
         try:
-            # if apt_package:
-            #     available_check = subprocess.run(
-            #         ['apt-cache', 'show', apt_package.name],
-            #         stdout=subprocess.PIPE,
-            #         stderr=subprocess.PIPE,
-            #         text=True
-            #     )
-            #     if available_check.returncode != 0:
-            #         adapter.log_error(f"Package provided in the config cannot be installed.", "Apt Management", command="export", method="export")
-            #         #sys.exit(1)
+            # If filtering, validate the requested package exists in apt-cache first
+            if apt_package and apt_package.name:
+                available_check = subprocess.run(
+                ['apt-cache', 'show', apt_package.name],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+                )
+                if available_check.returncode != 0:
+                    # Package not available in apt repos; return empty, don't exit
+                    return {"packages": []}
 
+            # Get all installed packages
             dpkg_output = subprocess.check_output(['dpkg-query', '-W', '-f=${Package}\n']).decode().splitlines()
             packages = []
+        
             for pkg in dpkg_output:
+                # If filtering and this package doesn't match the requested name, skip it
+                if apt_package and apt_package.name and pkg != apt_package.name:
+                    continue
+
                 try:
                     apt_cache_output = subprocess.check_output(['apt-cache', 'show', pkg]).decode()
                     pkg_info = {}
                     for line in apt_cache_output.splitlines():
                         if line.startswith('Package:'):
-
                             pkg_info['name'] = line.split(':', 1)[1].strip()
                         elif line.startswith('Version:'):
                             pkg_info['version'] = line.split(':', 1)[1].strip()
                         elif line.startswith('Depends:'):
-                            raw_deps = line.split(':', 1)[1].strip()
-                            pkg_info['dependencies'] = [d.strip() for d in raw_deps.split(',') if d.strip()]
+                            pkg_info['dependencies'] = line.split(':', 1)[1].strip()
                         elif line.startswith('Description:'):
                             pkg_info['description'] = line.split(':', 1)[1].strip()
+                    
 
-                    try:
-                        source_info = subprocess.run(
-                            ['apt-cache', 'policy', pkg_info['name']],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            text=True,
-                            check=False
-                        )
-                        lines = source_info.stdout.splitlines()
-                        installed_urls = []
-                        in_installed = False
-                        for raw_line in lines:
-                            line = raw_line.rstrip('\n')
-                            stripped = line.strip()
-                            if stripped.startswith('***'):
-                                in_installed = True
-                                continue
-                            if not in_installed:
-                                continue
-                            if stripped == '':
-                                break
-                            if (not line.startswith(' ') and
-                                not stripped.startswith('***') and
-                                '/var/lib/dpkg/status' not in stripped and
-                                not stripped.startswith('500 ') and
-                                not stripped[0].isdigit()):
-                                break
-                            if '/var/lib/dpkg/status' in stripped:
-                                continue
-                            tokens = stripped.split()
-                            if not tokens:
-                                continue
-                            url_token = None
-                            for t in tokens:
-                                if t.startswith('http://') or t.startswith('https://'):
-                                    url_token = t.rstrip('/')
-                                    break
-                            if url_token and url_token not in installed_urls:
-                                installed_urls.append(url_token)
-                        if installed_urls:
-                            pkg_info['source'] = installed_urls[0]
-                            pkg_info['sourceRepos'] = installed_urls
-                        else:
-                            pkg_info['source'] = "unknown"
-                    except Exception:
-                        pkg_info['source'] = "unknown"
+                    # Apply additional filters if provided
+                    if apt_package:
+                        # Filter by version if specified
+                        if apt_package.version and apt_package.version != pkg_info.get('version'):
+                            continue
+                        # Filter by source if specified
+                        if apt_package.source and apt_package.source != pkg_info.get('source'):
+                            continue
+                        # Note: dependencies filter is complex; skip for now or implement carefully
 
                     pkg_info['_exist'] = True
-
-                    if apt_package:
-                        if apt_package.name != pkg_info.get('name'):
-                            continue
-                        if apt_package.version not in (pkg_info['version'], None):
-                            continue
-                        if apt_package.source not in (pkg_info['source'], None):
-                            continue
-                        if apt_package.dependencies not in (pkg_info.get('dependencies', []), None):
-                            continue
-                    if pkg_info:
-                        packages.append(pkg_info)
+                    packages.append(pkg_info)
 
                 except subprocess.CalledProcessError:
                     continue
 
+            # If filtering was requested but no packages matched, return empty
             if apt_package and not packages:
-                adapter.log("error", f"Package provided in the config is not currently installed.", "Apt Management", command="export", method="export")
-                #sys.exit(1)
+                return {"packages": []}
 
-            result = {"packages": packages}
-            return result
+            return {"packages": packages}
+        
         except Exception as err:
-            adapter.log("error", f"Failed to export packages: {err}", "Apt Management", command="export", method="export")
-            return {'Error': str(err)}
-
-
+            return {'error': str(err)}

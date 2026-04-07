@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 class ExportOnlyResource:
     @staticmethod
     def export(instance: Optional[object] = None) -> Dict[str, Any]:
-        # Deterministic "exported" content; your adapter will pass through whatever dict we return
+        #Future change: _exist will be named different in the resource and mapped with DSC's _exist.
         return {
             "packages": [
                 {"name": "alpha", "version": "1.0.0", "_exist": True},

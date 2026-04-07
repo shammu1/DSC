@@ -23,7 +23,10 @@
       "adapter",
       "--operation",
       "get",
-      { "resourceTypeArg": "--ResourceType" },
+      { "resourceTypeArg": "--resource" },
+      {
+        "resourcePathArg": "--resource-path"
+      },
       {
         "jsonInputArg": "--input",
         "mandatory": true
@@ -38,7 +41,10 @@
       "adapter",
       "--operation",
       "set",
-      { "resourceTypeArg": "-ResourceType" },
+      { "resourceTypeArg": "--resource" },
+      {
+        "resourcePathArg": "--resource-path"
+      },
       {
         "jsonInputArg": "--input",
         "mandatory": true
@@ -55,7 +61,10 @@
       "adapter",
       "--operation",
       "test",
-      { "resourceTypeArg": "-ResourceType" },
+      { "resourceTypeArg": "--resource" },
+      {
+        "resourcePathArg": "--resource-path"
+      },
       {
         "jsonInputArg": "--input",
         "mandatory": true
@@ -71,7 +80,10 @@
       "adapter",
       "--operation",
       "export",
-      { "resourceTypeArg": "-ResourceType" },
+      { "resourceTypeArg": "--resource" },
+      {
+        "resourcePathArg": "--resource-path"
+      },
       {
         "jsonInputArg": "--input",
         "mandatory": true
@@ -86,7 +98,10 @@
       "adapter",
       "--operation",
       "validate",
-      { "resourceTypeArg": "-ResourceType" },
+      { "resourceTypeArg": "--resource" },
+      {
+        "resourcePathArg": "--resource-path"
+      },
       {
         "jsonInputArg": "--input",
         "mandatory": true

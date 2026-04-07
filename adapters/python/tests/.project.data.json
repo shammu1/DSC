@@ -4,7 +4,8 @@
   "TestOnly": true,
   "CopyFiles": {
     "All": [
-      "pythontest.dsc.manifests.json"
+      "pythontest.dsc.manifests.json",
+      "pythonintegration.tests.ps1"
     ]
   }
 }

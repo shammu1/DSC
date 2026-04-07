@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Tuple
 class TestOnlyResource:
     def __init__(self, name: str = "pkg", _exist: bool = True, desired_exist: bool = True, **_):
         self.name = name
+        #Future change: _exist will be named different in the resource and mapped with DSC's _exist.
         self._exist = _exist
         self.desired_exist = desired_exist
 
