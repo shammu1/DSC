@@ -3,7 +3,7 @@
     "Kind": "Adapter",
     "CopyFiles": {
         "All": [
-            "adapter.py",
+            "pyDscAdapter",
             "pythonadapter.dsc.resource.json"
         ]
     }

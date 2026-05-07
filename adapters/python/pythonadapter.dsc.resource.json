@@ -8,7 +8,7 @@
     "list": {
       "executable": "python3",
       "args": [
-        "adapter.py",
+        "pyDscAdapter/__main__.py",
         "adapter",
         "--operation",
         "list"
@@ -19,9 +19,9 @@
   "get": {
     "executable": "python3",
     "args": [
-      "adapter.py",
+      "pyDscAdapter/__main__.py",
       "adapter",
-      "--operation",
+      "--operation",  
       "get",
       { "resourceTypeArg": "--resource" },
       {
@@ -37,7 +37,7 @@
   "set": {
     "executable": "python3",
     "args": [
-      "adapter.py",
+      "pyDscAdapter/__main__.py",
       "adapter",
       "--operation",
       "set",
@@ -57,7 +57,7 @@
   "test": {
     "executable": "python3",
     "args": [
-      "adapter.py",
+      "pyDscAdapter/__main__.py",
       "adapter",
       "--operation",
       "test",
@@ -76,7 +76,7 @@
   "export": {
     "executable": "python3",
     "args": [
-      "adapter.py",
+      "pyDscAdapter/__main__.py",
       "adapter",
       "--operation",
       "export",
@@ -94,7 +94,7 @@
   "validate": {
     "executable": "python3",
     "args": [
-      "adapter.py",
+      "pyDscAdapter/__main__.py",
       "adapter",
       "--operation",
       "validate",
@@ -111,6 +111,7 @@
   },
   "exitCodes": {
     "0": "Success",
-    "1": "Error"
+    "1": "Error",
+    "2": "Invalid input"
   }
 }

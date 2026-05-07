@@ -1,4 +1,3 @@
-
 # tests/resources/test_only_resource.py
 import json
 from typing import Dict, Any, List, Tuple

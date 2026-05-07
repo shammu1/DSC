@@ -5,7 +5,9 @@
   "CopyFiles": {
     "All": [
       "pythontest.dsc.manifests.json",
-      "pythonintegration.tests.ps1"
+      "pythoncomponent.tests.ps1",
+      "pythonintegration.tests.ps1",
+      "pythonunit.tests.py"
     ]
   }
 }
